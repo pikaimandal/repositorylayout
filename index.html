@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GitHub Repoistory Directory Structure</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Generate a directory tree for a GitHub repository">
+    <meta name="keywords" content="github directory structure, github directory layout, repository, directory, structure, tree">
+    <meta name="author" content="Pikai Mandal">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent-color: #238636;
+            --accent-hover: #2ea44f;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--text-primary);
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+
+        #repo-url {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            color: var(--text-primary);
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 12px 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        #tree-output {
+            background-color: #21262d;
+            padding: 20px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #30363d;
+            position: relative;
+        }
+
+        #copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            font-size: 14px;
+            background-color: #30363d;
+            color: var(--text-secondary);
+        }
+
+        #copy-btn:hover {
+            background-color: #40474f;
+        }
+
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(13, 17, 23, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-content {
+            text-align: center;
+            color: var(--text-primary);
+            font-size: 18px;
+        }
+
+        .loading-spinner {
+            border: 4px solid var(--text-secondary);
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GitHub Repository Directory Structure</h1>
+        <input type="text" id="repo-url" placeholder="Enter GitHub Repository URL">
+        <div class="button-container">
+            <button onclick="generateRepoTree()">Detect Layout</button>
+        </div>
+        <div style="position: relative;">
+            <pre id="tree-output"></pre>
+            <button id="copy-btn" onclick="copyTree()" style="display: none;">Copy</button>
+        </div>
+    </div>
+
+    <div id="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            Detecting Directory Structure...
+        </div>
+    </div>
+
+    <script>
+        async function generateRepoTree() {
+            const repoUrlInput = document.getElementById('repo-url');
+            const treeOutput = document.getElementById('tree-output');
+            const copyBtn = document.getElementById('copy-btn');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const repoUrl = repoUrlInput.value.trim();
+
+            // Show loading overlay
+            loadingOverlay.style.display = 'flex';
+
+            if (!repoUrl.includes('github.com')) {
+                treeOutput.textContent = 'Please enter a valid GitHub repository URL';
+                copyBtn.style.display = 'none';
+                loadingOverlay.style.display = 'none';
+                return;
+            }
+
+            try {
+                // Parse GitHub URL
+                const urlParts = repoUrl.split('/');
+                const owner = urlParts[3];
+                const repo = urlParts[4];
+
+                // Fetch repository contents
+                const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}/contents`);
+                const tree = await generateDirectoryTree(owner, repo, '');
+                treeOutput.textContent = tree;
+                copyBtn.style.display = 'block';
+                
+                // Hide loading overlay
+                loadingOverlay.style.display = 'none';
+            } catch (error) {
+                console.error(error);
+                treeOutput.textContent = 'Error fetching repository contents. Check URL and try again.';
+                copyBtn.style.display = 'none';
+                
+                // Hide loading overlay
+                loadingOverlay.style.display = 'none';
+            }
+        }
+
+        function copyTree() {
+            const treeOutput = document.getElementById('tree-output');
+            navigator.clipboard.writeText(treeOutput.textContent).then(() => {
+                const copyBtn = document.getElementById('copy-btn');
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+
+        async function generateDirectoryTree(owner, repo, path, indent = '') {
+            let tree = '';
+            try {
+                const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`);
+                const contents = response.data;
+
+                contents.sort((a, b) => {
+                    if (a.type === b.type) return a.name.localeCompare(b.name);
+                    return a.type === 'dir' ? -1 : 1;
+                });
+
+                for (let [index, item] of contents.entries()) {
+                    const isLast = index === contents.length - 1;
+                    const prefix = isLast ? '└── ' : '├── ';
+
+                    if (item.type === 'dir') {
+                        tree += `${indent}${prefix}${item.name}/\n`;
+                        const subTree = await generateDirectoryTree(
+                            owner, 
+                            repo, 
+                            item.path, 
+                            indent + (isLast ? '    ' : '│   ')
+                        );
+                        tree += subTree;
+                    } else {
+                        tree += `${indent}${prefix}${item.name}\n`;
+                    }
+                }
+            } catch (error) {
+                console.error(`Error fetching contents for ${path}:`, error);
+            }
+            return tree;
+        }
+    </script>
+</body>
+</html>
